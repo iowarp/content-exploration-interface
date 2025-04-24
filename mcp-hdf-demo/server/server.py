@@ -26,11 +26,6 @@ def create_demo_hdf4(path):
         except Exception as e:
             print(f"Unable to create demo HDF4 file: {e}")
 
-create_demo_hdf5(HDF5_PATH)
-create_demo_hdf4(HDF4_PATH)
-
-mcp = FastMCP("HDF5/HDF4 Demo Server")
-
 def detect_format(path):
     ext = os.path.splitext(path)[1].lower()
     if ext in [".h5", ".hdf5"]:
@@ -40,7 +35,7 @@ def detect_format(path):
     else:
         return None
 
-@mcp.resource("hdf://{format}/{path}")
+@mcp.resource("hdf://{format}/{path:.*}")
 def get_hdf_resource(format: str, path: str) -> str:
     """Fetch a dataset from HDF5 or HDF4 file as a string."""
     if format == "hdf5":
@@ -91,4 +86,7 @@ def list_hdf_paths() -> str:
     return "\n".join(paths)
 
 if __name__ == "__main__":
+    create_demo_hdf5(HDF5_PATH)
+    create_demo_hdf4(HDF4_PATH)
+    mcp = FastMCP("HDF5/HDF4 Demo Server")
     mcp.run()
