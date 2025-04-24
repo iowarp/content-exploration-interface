@@ -18,16 +18,23 @@ async def main():
             for resource in resources:
                 print("-", resource)
 
-            # List all HDF5 paths using the tool
-            result = await session.call_tool("list_hdf5_paths")
-            print("\nHDF5 paths in server:")
+            # List all HDF5/HDF4 paths using the tool
+            result = await session.call_tool("list_hdf_paths")
+            print("\nHDF5/HDF4 paths in server:")
             print(result)
 
-            # Fetch a specific dataset as a resource
-            dataset_path = "group1/dataset1"
-            resource_uri = f"hdf5://{dataset_path}"
-            content, mime_type = await session.read_resource(resource_uri)
-            print(f"\nFetched resource '{resource_uri}':")
+            # Fetch a specific HDF5 dataset as a resource
+            hdf5_dataset_path = "group1/dataset1"
+            hdf5_resource_uri = f"hdf://hdf5/{hdf5_dataset_path}"
+            content, mime_type = await session.read_resource(hdf5_resource_uri)
+            print(f"\nFetched HDF5 resource '{hdf5_resource_uri}':")
+            print(content)
+
+            # Fetch a specific HDF4 dataset as a resource
+            hdf4_dataset_path = "dataset1"
+            hdf4_resource_uri = f"hdf://hdf4/{hdf4_dataset_path}"
+            content, mime_type = await session.read_resource(hdf4_resource_uri)
+            print(f"\nFetched HDF4 resource '{hdf4_resource_uri}':")
             print(content)
 
 if __name__ == "__main__":
