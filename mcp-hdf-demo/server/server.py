@@ -7,6 +7,8 @@ import os
 HDF5_PATH = "demo_data.h5"
 HDF4_PATH = "demo_data.hdf"
 
+mcp = FastMCP("HDF5/HDF4 Demo Server")
+
 def create_demo_hdf5(path):
     if not os.path.exists(path):
         with h5py.File(path, "w") as f:
@@ -88,5 +90,4 @@ def list_hdf_paths() -> str:
 if __name__ == "__main__":
     create_demo_hdf5(HDF5_PATH)
     create_demo_hdf4(HDF4_PATH)
-    mcp = FastMCP("HDF5/HDF4 Demo Server")
     mcp.run()
