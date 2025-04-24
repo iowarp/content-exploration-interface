@@ -4,5 +4,5 @@
 
 ## Model Context Protocol
 
-* mcp-hdf5-demo: HDF5 demo created by Windsurf
+* mcp-hdf-demo: HDF demo created by Windsurf
 
