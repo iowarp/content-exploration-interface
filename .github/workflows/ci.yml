@@ -1,0 +1,30 @@
+name: MCP HDF Demo CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.9, 3.10, 3.11]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install server dependencies
+      run: pip install -r mcp-hdf-demo/server/requirements.txt
+    - name: Install client dependencies
+      run: pip install -r mcp-hdf-demo/client/requirements.txt
+    - name: Run server in background
+      run: |
+        python mcp-hdf-demo/server/server.py &
+        sleep 5
+    - name: Test client
+      run: python mcp-hdf-demo/client/client.py
