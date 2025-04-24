@@ -37,37 +37,29 @@ def detect_format(path):
     else:
         return None
 
-@mcp.resource("hdf://{format}/{path:.*}")
-def get_hdf_resource(format: str, path: str) -> str:
-    """Fetch a dataset from HDF5 or HDF4 file as a string."""
-    if format == "hdf5":
-        with h5py.File(HDF5_PATH, "r") as f:
-            if path in f:
-                obj = f[path]
-                if isinstance(obj, h5py.Dataset):
-                    return str(obj[()])
-                elif isinstance(obj, h5py.Group):
-                    return f"Group contains: {list(obj.keys())}"
-                else:
-                    return "Unknown object type."
-            else:
-                return f"Path '{path}' not found in HDF5."
-    elif format == "hdf4":
-        try:
-            sd = SD(HDF4_PATH, SDC.READ)
-            if path in sd.datasets():
-                idx = sd.datasets()[path][0]
-                sds = sd.select(idx)
-                data = sds.get()
-                sds.endaccess()
-                sd.end()
-                return str(data)
-            else:
-                return f"Dataset '{path}' not found in HDF4."
-        except Exception as e:
-            return f"Error reading HDF4: {e}"
-    else:
-        return "Unknown format. Use 'hdf5' or 'hdf4'."
+
+@mcp.resource("hdf://hdf5/group1/dataset1")
+def get_hdf_resource() -> str:
+    with h5py.File(HDF5_PATH, "r") as f:
+        obj = f['group1/dataset1']
+        if isinstance(obj, h5py.Dataset):
+            return str(obj[()])
+        elif isinstance(obj, h5py.Group):
+            return f"Group contains: {list(obj.keys())}"
+        else:
+            return "Unknown object type."
+
+@mcp.resource("hdf://hdf4/dataset1")
+def get_hdf4_resource() -> str:
+    try:
+        sd = SD(HDF4_PATH, SDC.READ)
+        sds = sd.select('dataset1')
+        data = sds[:]
+        sds.endaccess()
+        sd.end()
+        return str(data)
+    except Exception as e:
+        return f"Error reading HDF4: {e}"
 
 @mcp.tool()
 def list_hdf_paths() -> str:
@@ -88,6 +80,6 @@ def list_hdf_paths() -> str:
     return "\n".join(paths)
 
 if __name__ == "__main__":
-    create_demo_hdf5(HDF5_PATH)
-    create_demo_hdf4(HDF4_PATH)
+#    create_demo_hdf5(HDF5_PATH)
+#    create_demo_hdf4(HDF4_PATH)
     mcp.run()

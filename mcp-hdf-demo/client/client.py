@@ -31,14 +31,14 @@ async def main():
             # Fetch a specific HDF5 dataset as a resource
             hdf5_dataset_path = "group1/dataset1"
             hdf5_resource_uri = f"hdf://hdf5/{hdf5_dataset_path}"
-            content, mime_type = await session.read_resource(hdf5_resource_uri)
+            content = await session.read_resource(hdf5_resource_uri)
             print(f"\nFetched HDF5 resource '{hdf5_resource_uri}':")
             print(content)
 
             # Fetch a specific HDF4 dataset as a resource
             hdf4_dataset_path = "dataset1"
             hdf4_resource_uri = f"hdf://hdf4/{hdf4_dataset_path}"
-            content, mime_type = await session.read_resource(hdf4_resource_uri)
+            content = await session.read_resource(hdf4_resource_uri)
             print(f"\nFetched HDF4 resource '{hdf4_resource_uri}':")
             print(content)
 
