@@ -1,10 +1,15 @@
 import asyncio
-from mcp import ClientSession
-from mcp.client.local import local_client
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
 
 async def main():
-    # Connect to the local MCP server (default port 8080)
-    async with local_client() as (read, write):
+    # Use stdio_client to launch the server as a subprocess for testing
+    server_params = StdioServerParameters(
+        command="python",
+        args=["server/server.py"],
+        env=None
+    )
+    async with stdio_client(server_params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
 
