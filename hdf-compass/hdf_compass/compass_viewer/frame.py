@@ -361,13 +361,22 @@ class NodeFrame(BaseFrame):
 
         self.info.display(node)
 
-        # Create File menu
-        file_menu = wx.Menu()
-        file_menu.Append(wx.ID_CLOSE, "&Close Window\tCtrl+W")
-        file_menu.Append(ID_CLOSE_FILE, "Close &File\tCtrl+Shift+W")
-        file_menu.AppendSeparator()
-        file_menu.Append(wx.ID_EXIT, "E&xit\tAlt+F4")
-        self.add_menu(file_menu, "&File")
+        # Modify existing File menu to add node-specific items
+        menubar = self.GetMenuBar()
+        if menubar and menubar.GetMenuCount() > 0:
+            file_menu = menubar.GetMenu(0)  # File menu is typically the first menu
+            if file_menu:
+                # Add separator and node-specific menu items
+                file_menu.AppendSeparator()
+                file_menu.Append(ID_CLOSE_FILE, "Close &File\tCtrl+Shift+W")
+        else:
+            # Fallback: create File menu if none exists
+            file_menu = wx.Menu()
+            file_menu.Append(wx.ID_CLOSE, "&Close Window\tCtrl+W")
+            file_menu.Append(ID_CLOSE_FILE, "Close &File\tCtrl+Shift+W")
+            file_menu.AppendSeparator()
+            file_menu.Append(wx.ID_EXIT, "E&xit\tAlt+F4")
+            self.add_menu(file_menu, "&File")
 
         self.Bind(wx.EVT_CLOSE, self.on_close_evt)
         self.Bind(wx.EVT_MENU, self.on_close_window, id=wx.ID_CLOSE)

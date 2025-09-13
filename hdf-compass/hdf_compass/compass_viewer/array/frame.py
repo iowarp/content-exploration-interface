@@ -73,11 +73,86 @@ class ArrayPanel(wx.Panel):
         
     def plot_data(self):
         """ Plot the data """
-        pass  # TODO: Implement
+        try:
+            from .plot import LinePlotFrame, ContourPlotFrame
+            import numpy as np
+            
+            # Get the array frame to access the node data
+            array_frame = self.GetParent()
+            node = array_frame.node
+            
+            # Get the raw data from the node
+            data = node[:]
+            
+            # Determine plot type based on dimensionality
+            if len(data.shape) == 0:
+                wx.MessageBox("Cannot plot scalar data", "Plot Error", wx.OK | wx.ICON_ERROR)
+                return
+            elif len(data.shape) == 1:
+                # 1D data - line plot
+                plot_frame = LinePlotFrame([data], ["Data"], title=f"Plot: {node.display_name}")
+            elif len(data.shape) == 2:
+                # 2D data - contour plot
+                plot_frame = ContourPlotFrame(data, ["Data"], title=f"Contour: {node.display_name}")
+            else:
+                # Multi-dimensional - plot first 2D slice
+                if data.shape[0] == 1:
+                    data_2d = data[0]
+                else:
+                    data_2d = data[0]
+                plot_frame = ContourPlotFrame(data_2d, ["Data"], title=f"Contour (slice): {node.display_name}")
+                
+            plot_frame.Show()
+            
+        except Exception as e:
+            wx.MessageBox(f"Error creating plot: {e}", "Plot Error", wx.OK | wx.ICON_ERROR)
         
     def plot_xy(self):
         """ Plot XY data """
-        pass  # TODO: Implement
+        try:
+            from .plot import LineXYPlotFrame
+            import numpy as np
+            
+            # Get the array frame to access the node data
+            array_frame = self.GetParent()
+            node = array_frame.node
+            
+            # Get the raw data from the node
+            data = node[:]
+            
+            # For XY plot, we need at least 2D data or 1D data that can be split
+            if len(data.shape) == 0:
+                wx.MessageBox("Cannot create XY plot from scalar data", "Plot Error", wx.OK | wx.ICON_ERROR)
+                return
+            elif len(data.shape) == 1:
+                # 1D data - create X as indices and Y as data values
+                x_data = np.arange(len(data))
+                y_data = data
+                plot_data = [x_data, y_data]
+                names = ["Index", "Value"]
+            elif len(data.shape) == 2:
+                # 2D data - use first column as X and second as Y
+                if data.shape[1] >= 2:
+                    x_data = data[:, 0]
+                    y_data = data[:, 1]
+                    plot_data = [x_data, y_data]
+                    names = ["Column 0", "Column 1"]
+                else:
+                    # Only one column - use indices as X
+                    x_data = np.arange(data.shape[0])
+                    y_data = data[:, 0]
+                    plot_data = [x_data, y_data]
+                    names = ["Row Index", "Value"]
+            else:
+                wx.MessageBox("XY plotting not supported for data with more than 2 dimensions", "Plot Error", wx.OK | wx.ICON_ERROR)
+                return
+                
+            # Create XY plot
+            plot_frame = LineXYPlotFrame(plot_data, names, title=f"XY Plot: {node.display_name}")
+            plot_frame.Show()
+            
+        except Exception as e:
+            wx.MessageBox(f"Error creating XY plot: {e}", "Plot Error", wx.OK | wx.ICON_ERROR)
 
 
 # Indicates that the slicing selection may have changed.
@@ -125,8 +200,9 @@ class ArrayFrame(NodeFrame):
         self.toolbar = self.CreateToolBar()
         self.toolbar.AddTool(wx.ID_COPY, "Copy", wx.ArtProvider.GetBitmap(wx.ART_COPY))
         self.toolbar.AddTool(wx.ID_SAVEAS, "Export", wx.ArtProvider.GetBitmap(wx.ART_FILE_SAVE))
-        self.toolbar.AddTool(wx.ID_ZOOM_IN, "Plot Data", wx.ArtProvider.GetBitmap(wx.ART_PLUS))
-        self.toolbar.AddTool(wx.ID_ZOOM_OUT, "Plot XY", wx.ArtProvider.GetBitmap(wx.ART_MINUS))
+        # Use chart/graph-like icons for plotting
+        self.toolbar.AddTool(wx.ID_ZOOM_IN, "Plot Data", wx.ArtProvider.GetBitmap(wx.ART_TIP))
+        self.toolbar.AddTool(wx.ID_ZOOM_OUT, "Plot XY", wx.ArtProvider.GetBitmap(wx.ART_INFORMATION))
         self.toolbar.Realize()
 
         # Create array panel and set it as the view (this will properly layout with InfoPanel)
@@ -187,7 +263,7 @@ class ArrayFrame(NodeFrame):
         # Get data currently in the grid
         if rank > 1 and self.node.dtype.names is None:
             args = []
-            for x in xrange(rank):
+            for x in range(rank):
                 if x == self.row:
                     args.append(slice(None, None, None))
                 elif x == self.col:
@@ -232,7 +308,7 @@ class ArrayFrame(NodeFrame):
         else:
             # The data is compound
             if self.node.dtype.names is not None:
-                names = [self.grid.GetColLabelValue(x) for x in xrange(self.grid.GetNumberCols())]
+                names = [self.grid.GetColLabelValue(x) for x in range(self.grid.GetNumberCols())]
                 data = [data[n] for n in names]
                 return data, names, True
 
