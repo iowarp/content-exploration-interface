@@ -36,7 +36,7 @@ def sort_key(name):
 
     We provide "natural" sort order; e.g. "7" comes before "12".
     """
-    return [(int(''.join(g)) if k else ''.join(g)) for k, g in groupby(name, key=unicode.isdigit)]
+    return [(int(''.join(g)) if k else ''.join(g)) for k, g in groupby(name, key=str.isdigit)]
 
 
 class HDF5Store(compass_model.Store):
@@ -68,8 +68,7 @@ class HDF5Store(compass_model.Store):
 
     @property
     def root(self):
-        return container(HDF5Store, url, HDF5Group, "/")
-        # return self['/']
+        return self['/']
 
     @property
     def valid(self):
@@ -182,8 +181,15 @@ class HDF5Group(compass_model.Container):
             yield self.store[pp.join(self.key, name)]
 
     def __getitem__(self, idx):
-        name = self._names[idx]
-        return self.store[pp.join(self.key, name)]
+        try:
+            if idx < 0 or idx >= len(self._names):
+                raise IndexError(f"Index {idx} out of range for container with {len(self._names)} items")
+            name = self._names[idx]
+            full_key = pp.join(self.key, name)
+            return self.store[full_key]
+        except Exception as e:
+            log.exception(f"Error accessing item {idx} in HDF5Group {self.key}: {e}")
+            raise
 
 
 class HDF5Dataset(compass_model.Array):
@@ -316,7 +322,7 @@ class HDF5KV(compass_model.KeyValue):
         self._store = store
         self._key = key
         self._obj = store.f[key]
-        self._names = self._obj.attrs.keys()
+        self._names = list(self._obj.attrs.keys())
 
     @property
     def key(self):

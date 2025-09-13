@@ -66,6 +66,9 @@ class BaseFrame(wx.Frame):
     def __init__(self, **kwds):
         """ Create a new base frame """
         log.debug(self.__class__.__name__)
+        # Handle pos=None case for wxPython compatibility
+        if 'pos' in kwds and kwds['pos'] is None:
+            kwds['pos'] = wx.DefaultPosition
         super(BaseFrame, self).__init__(None, **kwds)
 
         # Set icon
@@ -188,6 +191,14 @@ class BaseFrame(wx.Frame):
         wx.MessageBox("HDF Compass Viewer\n\nA viewer for HDF files",
                      "About HDF Compass", wx.OK | wx.ICON_INFORMATION)
 
+    def add_menu(self, menu, title):
+        """ Add a menu to the menu bar """
+        menubar = self.GetMenuBar()
+        if not menubar:
+            menubar = wx.MenuBar()
+            self.SetMenuBar(menubar)
+        menubar.Append(menu, title)
+
 
 class InitFrame(BaseFrame):
     """ Frame displayed when the application starts up.
@@ -294,7 +305,7 @@ class NodeFrame(BaseFrame):
         if self.__view is None:
             self.__sizer.Add(window, 1, wx.EXPAND)
         else:
-            self.__sizer.Remove(self.__view)
+            self.__sizer.Detach(self.__view)
             self.__view.Destroy()
             self.__sizer.Add(window, 1, wx.EXPAND)
         self.__view = window
@@ -308,9 +319,16 @@ class NodeFrame(BaseFrame):
 
         super(NodeFrame, self).__init__(**kwds)
 
-        # Enable the "Close File" menu entry
-        fm = self.GetMenuBar().GetMenu(0)
-        fm.Enable(ID_CLOSE_FILE, True)
+        # Enable the "Close File" menu entry if it exists
+        try:
+            menubar = self.GetMenuBar()
+            if menubar and menubar.GetMenuCount() > 0:
+                fm = menubar.GetMenu(0)
+                if fm and fm.FindItem(ID_CLOSE_FILE) != wx.NOT_FOUND:
+                    fm.Enable(ID_CLOSE_FILE, True)
+        except wx.wxAssertionError:
+            # Menu item doesn't exist, ignore
+            pass
 
         # Create the "window" menu to hold "Reopen As" items.
         wm = wx.Menu()

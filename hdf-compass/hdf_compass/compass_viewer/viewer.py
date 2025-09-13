@@ -199,13 +199,23 @@ def open_store(url):
     stores = [x for x in compass_model.get_stores() if x.can_handle(url)]
 
     if len(stores) > 0:
-        store = stores[0]
+        store_class = stores[0]
+        log.debug("open_store: attempting to create store instance of type %s" % store_class.__name__)
         try:
-            # root = store.get_node(url)
+            # Create an instance of the store
+            store = store_class(url)
+            log.debug("open_store: store instance created successfully")
+            
             root = store.root
+            log.debug("open_store: got root node: %s" % root)
+            
             if root is not None:
+                log.debug("open_store: calling open_node")
                 open_node(root)
+                log.debug("open_store: open_node completed successfully")
                 return True
+            else:
+                log.error("open_store: root is None")
         except Exception as e:
             log.error("Error opening store: %s" % str(e))
             wx.MessageBox("Error opening file: %s" % str(e), "Error", wx.OK | wx.ICON_ERROR)
@@ -261,9 +271,13 @@ def load_plugins():
 
     try:
         from hdf_compass import bag_model
-        from hydroffice import bag
         from lxml import etree
-        log.debug("hydroffice.bag %s" % bag.__version__)
+        # Try to import hydroffice.bag, but don't fail if it's not available
+        try:
+            from hydroffice import bag
+            log.debug("hydroffice.bag %s" % bag.__version__)
+        except ImportError:
+            log.debug("Using h5py fallback for BAG files (hydroffice.bag not available)")
         log.debug("lxml %s (libxml %s, libxslt %s)"
                   % (etree.__version__, ".".join(str(i) for i in etree.LIBXML_VERSION),
                      ".".join(str(i) for i in etree.LIBXSLT_VERSION)))

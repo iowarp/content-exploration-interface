@@ -34,23 +34,29 @@ class ContainerList(wx.ListCtrl):
 
     def __init__(self, parent, node, **kwds):
         """ Create a new container list control """
-        style = wx.LC_REPORT | wx.LC_SINGLE_SEL | wx.BORDER_SUNKEN
+        default_style = wx.LC_REPORT | wx.LC_SINGLE_SEL | wx.BORDER_SUNKEN
         if 'style' in kwds:
-            style |= kwds.pop('style')
+            # Use the passed style, preserving non-conflicting flags
+            passed_style = kwds.pop('style')
+            # Keep BORDER and SINGLE_SEL but replace the view mode
+            style = passed_style | wx.LC_SINGLE_SEL | wx.BORDER_SUNKEN
+        else:
+            style = default_style
         super(ContainerList, self).__init__(parent, style=style, **kwds)
 
         self.node = node
         self.parent = parent
 
-        # Create columns
-        self.InsertColumn(0, "Name")
-        self.InsertColumn(1, "Type")
-        self.InsertColumn(2, "Size")
+        # Create columns only for report view
+        if style & wx.LC_REPORT:
+            self.InsertColumn(0, "Name")
+            self.InsertColumn(1, "Type")
+            self.InsertColumn(2, "Size")
 
-        # Set column widths
-        self.SetColumnWidth(0, 200)
-        self.SetColumnWidth(1, 100)
-        self.SetColumnWidth(2, 100)
+            # Set column widths
+            self.SetColumnWidth(0, 200)
+            self.SetColumnWidth(1, 100)
+            self.SetColumnWidth(2, 100)
 
         # Set size hints
         self.SetMinSize((400, 300))
@@ -75,21 +81,35 @@ class ContainerList(wx.ListCtrl):
     def on_item_activated(self, evt):
         """ Handle item activation """
         index = evt.GetIndex()
-        child = self.node[index]
-        # Get the current position of the parent frame
-        pos = self.parent.GetPosition()
-        # Create and post the open event with position
-        open_event = CompassOpenEvent(child, pos=pos)
-        wx.PostEvent(wx.GetApp(), open_event)
+        try:
+            if index < 0 or index >= len(self.node):
+                log.warning(f"Item activation index {index} out of bounds")
+                evt.Skip()
+                return
+            child = self.node[index]
+            # Get the current position of the parent frame
+            pos = self.parent.GetPosition()
+            # Create and post the open event with position
+            open_event = CompassOpenEvent(child, pos=pos)
+            wx.PostEvent(wx.GetApp(), open_event)
+        except Exception as e:
+            log.exception(f"Error in item activation: {e}")
         evt.Skip()
 
     def on_item_selected(self, evt):
         """ Handle item selection """
         index = evt.GetIndex()
-        child = self.node[index]
-        # Create and post the selection event
-        selection_event = ContainerSelectionEvent(child)
-        wx.PostEvent(self.parent, selection_event)
+        try:
+            if index < 0 or index >= len(self.node):
+                log.warning(f"Item selection index {index} out of bounds")
+                evt.Skip()
+                return
+            child = self.node[index]
+            # Create and post the selection event
+            selection_event = ContainerSelectionEvent(child)
+            wx.PostEvent(self.parent, selection_event)
+        except Exception as e:
+            log.exception(f"Error in item selection: {e}")
         evt.Skip()
 
     def on_right_click(self, evt):
@@ -139,7 +159,11 @@ class ContainerIconList(ContainerList):
         self.SetMinSize((600, 400))
 
         # Set up image list for icons
-        self.il = wx.GetApp().imagelists[64]
+        app = wx.GetApp()
+        if not hasattr(app, 'imagelists') or 64 not in app.imagelists:
+            # Ensure imagelists are initialized
+            app.init_imagelists()
+        self.il = app.imagelists[64]
         self.SetImageList(self.il, wx.IMAGE_LIST_NORMAL)
 
         # Clear any existing items
@@ -149,8 +173,12 @@ class ContainerIconList(ContainerList):
         for item in range(len(self.node)):
             try:
                 subnode = self.node[item]
-                image_index = self.il.get_index(type(subnode))
-                self.InsertItem(item, subnode.display_name, image_index)
+                if hasattr(self, 'il') and self.il is not None:
+                    image_index = self.il.get_index(type(subnode))
+                    self.InsertItem(item, subnode.display_name, image_index)
+                else:
+                    # Fallback without icon if image list not available
+                    self.InsertItem(item, subnode.display_name)
             except:
                 log.exception("Error adding icon item")
 
@@ -160,12 +188,24 @@ class ContainerIconList(ContainerList):
 
     def populate(self):
         """ Override populate to handle icon view """
+        # Ensure image list is available
+        if not hasattr(self, 'il') or self.il is None:
+            app = wx.GetApp()
+            if not hasattr(app, 'imagelists') or 64 not in app.imagelists:
+                app.init_imagelists()
+            self.il = app.imagelists[64]
+            self.SetImageList(self.il, wx.IMAGE_LIST_NORMAL)
+        
         self.DeleteAllItems()
         for item in range(len(self.node)):
             try:
                 subnode = self.node[item]
-                image_index = self.il.get_index(type(subnode))
-                self.InsertItem(item, subnode.display_name, image_index)
+                if hasattr(self, 'il') and self.il is not None:
+                    image_index = self.il.get_index(type(subnode))
+                    self.InsertItem(item, subnode.display_name, image_index)
+                else:
+                    # Fallback without icon if image list not available
+                    self.InsertItem(item, subnode.display_name)
             except:
                 log.exception("Error adding icon item")
         self.Layout()
@@ -203,7 +243,11 @@ class ContainerReportList(ContainerList):
         self.SetMinSize((500, 400))
 
         # Set up image list
-        self.il = wx.GetApp().imagelists[16]
+        app = wx.GetApp()
+        if not hasattr(app, 'imagelists') or 16 not in app.imagelists:
+            # Ensure imagelists are initialized
+            app.init_imagelists()
+        self.il = app.imagelists[16]
         self.SetImageList(self.il, wx.IMAGE_LIST_SMALL)
 
         # Set up virtual list
@@ -220,24 +264,43 @@ class ContainerReportList(ContainerList):
     def OnGetItemText(self, item, col):
         """ Callback method to support virtual list ctrl """
         try:
+            # Check bounds first
+            if item < 0 or item >= len(self.node):
+                log.warning(f"Item index {item} out of bounds (length: {len(self.node)})")
+                return ""
+                
+            subnode = self.node[item]
             if col == 0:
-                return self.node[item].display_name
+                return subnode.display_name
             elif col == 1:
-                return type(self.node[item]).class_kind
-        except:
-            log.exception("Error getting item text")
+                return type(subnode).class_kind
+        except Exception as e:
+            log.exception(f"Error getting item text for item {item}, col {col}: {e}")
         return ""
 
     def OnGetItemImage(self, item):
         """ Callback method to support virtual list ctrl """
         try:
+            # Check bounds first
+            if item < 0 or item >= len(self.node):
+                log.warning(f"Item index {item} out of bounds (length: {len(self.node)})")
+                return -1
+                
             subnode = self.node[item]
-            return self.il.get_index(type(subnode))
-        except:
-            log.exception("Error getting item image")
+            if hasattr(self, 'il') and self.il is not None:
+                return self.il.get_index(type(subnode))
+            return -1
+        except Exception as e:
+            log.exception(f"Error getting item image for item {item}: {e}")
             return -1
 
     def populate(self):
         """ Override populate to use virtual list """
-        self.SetItemCount(len(self.node))
-        self.Refresh()
+        try:
+            node_length = len(self.node)
+            log.debug(f"Setting virtual list item count to {node_length}")
+            self.SetItemCount(node_length)
+            self.Refresh()
+        except Exception as e:
+            log.exception(f"Error in populate: {e}")
+            self.SetItemCount(0)

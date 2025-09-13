@@ -78,7 +78,7 @@ class ContainerFrame(NodeFrame):
         ])
         self.SetAcceleratorTable(self.acc_tbl)
 
-        self.Bind(wx.EVT_MENU, self.on_open, id=ID_COMPASS_OPEN)
+        self.Bind(wx.EVT_MENU, self.on_compass_open, id=ID_COMPASS_OPEN)
         self.Bind(EVT_CONTAINER_SELECTION, lambda evt: self.update_info())
 
         self.Bind(wx.EVT_MENU, lambda evt: self.go_back(), id=ID_GO_MENU_BACK)
@@ -88,7 +88,12 @@ class ContainerFrame(NodeFrame):
         self.Bind(wx.EVT_MENU, lambda evt: self.list_view(), id=ID_VIEW_MENU_LIST)
         self.Bind(wx.EVT_MENU, lambda evt: self.icon_view(), id=ID_VIEW_MENU_ICON)
 
-        self.toolbar = self.CreateToolBar(wx.TB_HORIZONTAL | wx.NO_BORDER | wx.TB_FLAT | wx.TB_TEXT)
+        # Only create toolbar if it doesn't exist
+        existing_toolbar = self.GetToolBar()
+        if existing_toolbar:
+            self.toolbar = existing_toolbar
+        else:
+            self.toolbar = self.CreateToolBar(wx.TB_HORIZONTAL | wx.NO_BORDER | wx.TB_FLAT | wx.TB_TEXT)
 
         tsize = (24, 24)
         back_bmp = wx.Bitmap(os.path.join(self.icon_folder, "go_back_24.png"), wx.BITMAP_TYPE_ANY)
@@ -172,8 +177,17 @@ class ContainerFrame(NodeFrame):
 
     # --- End history support functions ---------------------------------------
 
+    @property
+    def node(self):
+        """ Get the current node from history """
+        if hasattr(self, 'history') and self.history and hasattr(self, 'history_ptr'):
+            return self.history[self.history_ptr]
+        else:
+            # Fallback to parent implementation during initialization
+            return super(ContainerFrame, self).node
+
     def update_view(self):
-        """ Refresh the entire contents of the frame according to self.node. """
+        """ Refresh the entire contents of the frame according to current history node. """
         self.SetTitle(self.node.display_title)
         self.view = type(self.view)(self, self.node)
         self.update_info()
@@ -204,15 +218,37 @@ class ContainerFrame(NodeFrame):
             node = self.node  # Nothing selected; show this node's info
         self.info.display(node)
 
-    def on_open(self, evt):
+    def on_compass_open(self, evt):
         """ Handle compass open event.
         
         If the node is a container, navigate to it in this frame.
         Otherwise, let the event propagate to create a new window.
         """
-        new_node = evt.node
-        log.debug("Got request to open node: %s" % new_node.key)
-        if isinstance(new_node, compass_model.Container):
-            self.go(new_node)
-        else:
-            evt.Skip()  # Let the event propagate to create a new window
+        try:
+            # Check if this is a CompassOpenEvent with a node attribute
+            if hasattr(evt, 'node'):
+                new_node = evt.node
+                log.debug("Got request to open node: %s" % new_node.key)
+                if isinstance(new_node, compass_model.Container):
+                    self.go(new_node)
+                else:
+                    evt.Skip()  # Let the event propagate to create a new window
+            else:
+                # This might be a menu event when no specific node is selected
+                # Check if there's a current selection in the view
+                if hasattr(self.view, 'selection') and self.view.selection is not None:
+                    selected_node = self.view.selection
+                    log.debug("Opening selected node: %s" % selected_node.key)
+                    if isinstance(selected_node, compass_model.Container):
+                        self.go(selected_node)
+                    else:
+                        # Create an open event for the selected node to open in new window
+                        from ..events import CompassOpenEvent
+                        open_event = CompassOpenEvent(selected_node, pos=self.GetPosition())
+                        wx.PostEvent(wx.GetApp(), open_event)
+                else:
+                    log.debug("No node selected for open action")
+                    evt.Skip()
+        except Exception as e:
+            log.exception(f"Error in on_open: {e}")
+            evt.Skip()

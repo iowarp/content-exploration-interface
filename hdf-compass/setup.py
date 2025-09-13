@@ -94,10 +94,10 @@ setup_args['setup_requires'] =\
     ]
 setup_args['install_requires'] =\
     [
-        "numpy",
-        "matplotlib>=1.5",
-        "h5py",
-        "wxPython==3.0.2",
+        "numpy>=1.19.0",
+        "matplotlib>=3.8.0",
+        "h5py>=2.10.0",
+        "wxPython>=4.0.0",
         "requests"
     ]
 setup_args['extras_require'] =\

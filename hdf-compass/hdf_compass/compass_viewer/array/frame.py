@@ -29,6 +29,56 @@ log = logging.getLogger(__name__)
 from ..frame import NodeFrame
 from .plot import LinePlotFrame, LineXYPlotFrame, ContourPlotFrame
 
+class ArrayPanel(wx.Panel):
+    """ Simple array panel with grid display """
+    def __init__(self, parent, node):
+        super(ArrayPanel, self).__init__(parent)
+        self.node = node
+        
+        # Create a simple grid to show the array data
+        self.grid = wx.grid.Grid(self)
+        
+        # Set up grid based on array shape
+        if len(node.shape) == 0:  # scalar
+            self.grid.CreateGrid(1, 1)
+            self.grid.SetCellValue(0, 0, str(node[:]))
+        elif len(node.shape) == 1:  # 1D array
+            rows = min(node.shape[0], 1000)  # Limit display for performance
+            self.grid.CreateGrid(rows, 1)
+            data = node[:rows]
+            for i in range(rows):
+                self.grid.SetCellValue(i, 0, str(data[i]))
+        else:  # 2D or higher
+            rows = min(node.shape[0], 100)
+            cols = min(node.shape[1], 100) if len(node.shape) > 1 else 1
+            self.grid.CreateGrid(rows, cols)
+            if len(node.shape) == 2:
+                data = node[:rows, :cols]
+                for i in range(rows):
+                    for j in range(cols):
+                        self.grid.SetCellValue(i, j, str(data[i, j]))
+        
+        # Layout
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(self.grid, 1, wx.EXPAND)
+        self.SetSizer(sizer)
+        
+    def copy(self):
+        """ Copy selected data to clipboard """
+        pass  # TODO: Implement
+        
+    def export(self, path):
+        """ Export data to CSV file """
+        pass  # TODO: Implement
+        
+    def plot_data(self):
+        """ Plot the data """
+        pass  # TODO: Implement
+        
+    def plot_xy(self):
+        """ Plot XY data """
+        pass  # TODO: Implement
+
 
 # Indicates that the slicing selection may have changed.
 # These events are emitted by the SlicerPanel.
@@ -68,7 +118,12 @@ class ArrayFrame(NodeFrame):
         super(ArrayFrame, self).__init__(node, size=(800, 400), title=node.display_name, pos=pos)
 
         # Create toolbar
-        self.toolbar = self.CreateToolBar()
+        # Only create toolbar if it doesn't exist
+        existing_toolbar = self.GetToolBar()
+        if existing_toolbar:
+            self.toolbar = existing_toolbar
+        else:
+            self.toolbar = self.CreateToolBar()
         self.toolbar.AddTool(wx.ID_COPY, "Copy", wx.ArtProvider.GetBitmap(wx.ART_COPY))
         self.toolbar.AddTool(wx.ID_SAVEAS, "Export", wx.ArtProvider.GetBitmap(wx.ART_FILE_SAVE))
         self.toolbar.AddTool(wx.ID_ZOOM_IN, "Plot Data", wx.ArtProvider.GetBitmap(wx.ART_PLUS))

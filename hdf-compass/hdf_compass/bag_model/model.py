@@ -20,9 +20,80 @@ import os.path as op
 import posixpath as pp
 import h5py
 
-from hydroffice.bag import is_bag
-from hydroffice.bag import BAGFile
-from hydroffice.bag import BAGError
+# Try to import hydroffice.bag, fall back to h5py if not available
+try:
+    from hydroffice.bag import is_bag
+    from hydroffice.bag import BAGFile
+    from hydroffice.bag import BAGError
+    HAS_HYDROFFICE_BAG = True
+except ImportError:
+    import h5py
+    import numpy as np
+    HAS_HYDROFFICE_BAG = False
+    
+    def is_bag(path):
+        """Simple BAG file detection using h5py"""
+        try:
+            with h5py.File(path, 'r') as f:
+                return 'BAG_root' in f
+        except:
+            return False
+    
+    class BAGError(Exception):
+        pass
+    
+    class BAGFile:
+        """Simple BAG file wrapper using h5py"""
+        def __init__(self, path, mode='r'):
+            self.filename = path
+            self._file = h5py.File(path, mode)
+            
+        def close(self):
+            self._file.close()
+            
+        def __contains__(self, key):
+            return key in self._file
+            
+        def __getitem__(self, key):
+            return self._file[key]
+        
+        def elevation(self, mask_nan=False):
+            """Get elevation data"""
+            data = self._file['BAG_root/elevation'][:]
+            if mask_nan:
+                data = np.ma.masked_invalid(data)
+            return data
+            
+        def uncertainty(self, mask_nan=False):
+            """Get uncertainty data"""
+            data = self._file['BAG_root/uncertainty'][:]
+            if mask_nan:
+                data = np.ma.masked_invalid(data)
+            return data
+            
+        def tracking_list(self):
+            """Get tracking list data"""
+            return self._file['BAG_root/tracking_list'][:]
+            
+        def metadata(self, as_string=True, as_pretty_xml=False):
+            """Get metadata"""
+            if as_string:
+                data = self._file['BAG_root/metadata'][:]
+                if isinstance(data, bytes):
+                    return data.decode('utf-8')
+                return str(data)
+            return self._file['BAG_root/metadata'][:]
+            
+        def populate_metadata(self):
+            """Simple metadata object"""
+            class SimpleMeta:
+                def geo_extent(self):
+                    return (0, 1, 0, 1)  # Default extent
+            return SimpleMeta()
+            
+        def validation_info(self):
+            """Validation info placeholder"""
+            return "Validation not available without hydroffice.bag package"
 
 from hdf_compass import compass_model
 from hdf_compass.utils import url2path
@@ -36,7 +107,7 @@ def sort_key(name):
 
     We provide "natural" sort order; e.g. "7" comes before "12".
     """
-    return [(int(''.join(g)) if k else ''.join(g)) for k, g in groupby(name, key=unicode.isdigit)]
+    return [(int(''.join(g)) if k else ''.join(g)) for k, g in groupby(name, key=str.isdigit)]
 
 
 class BAGStore(compass_model.Store):
@@ -761,7 +832,7 @@ class BAGKV(compass_model.KeyValue):
         self._store = store
         self._key = key
         self._obj = store.f[key]
-        self._names = self._obj.attrs.keys()
+        self._names = list(self._obj.attrs.keys())
 
     @property
     def key(self):

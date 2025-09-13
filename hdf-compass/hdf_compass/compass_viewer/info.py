@@ -73,7 +73,7 @@ class InfoPanel(wx.Panel):
         self.prop_text.SetLabel(describe(node))
 
         if self.static_bitmap is not None:
-            self.sizer.Remove(self.static_bitmap)
+            self.sizer.Detach(self.static_bitmap)
             self.static_bitmap.Destroy()
 
         # We load the PNG icon directly from the appropriate Node class

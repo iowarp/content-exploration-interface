@@ -24,9 +24,9 @@ log = logging.getLogger(__name__)
 ID_COMPASS_OPEN = wx.ID_ANY
 
 # Create new event type
-CompassOpenEvent, EVT_COMPASS_OPEN = NewEvent()
+_CompassOpenEvent, EVT_COMPASS_OPEN = NewEvent()
 
-class CompassOpenEvent(wx.PyCommandEvent):
+class CompassOpenEvent(_CompassOpenEvent):
     """ Event sent when a node should be opened """
     def __init__(self, node, pos=None):
         super(CompassOpenEvent, self).__init__()
@@ -49,4 +49,10 @@ class CompassOpenEvent(wx.PyCommandEvent):
 
 # Hints that the selected item in the view may have changed.
 # Interested parties should inspect the view to figure out the new selection.
-ContainerSelectionEvent, EVT_CONTAINER_SELECTION = NewEvent()
+_ContainerSelectionEvent, EVT_CONTAINER_SELECTION = NewEvent()
+
+class ContainerSelectionEvent(_ContainerSelectionEvent):
+    """ Event sent when container selection changes """
+    def __init__(self, node=None):
+        super(ContainerSelectionEvent, self).__init__()
+        self.node = node
