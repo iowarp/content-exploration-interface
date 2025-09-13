@@ -146,6 +146,11 @@ class XmlFrame(NodeFrame):
         if self.node.has_validation():
             validate_bmp = wx.Bitmap(os.path.join(self.icon_folder, "xml_validate_24.png"), wx.BITMAP_TYPE_ANY)
 
+        # Create text-specific toolbar (replace any existing toolbar)
+        existing_toolbar = self.GetToolBar()
+        if existing_toolbar:
+            existing_toolbar.Destroy()
+        
         self.toolbar = self.CreateToolBar(wx.TB_HORIZONTAL | wx.NO_BORDER | wx.TB_FLAT | wx.TB_TEXT)
 
         self.toolbar.SetToolBitmapSize(t_size)
