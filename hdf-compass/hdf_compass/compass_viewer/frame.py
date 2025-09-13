@@ -361,21 +361,48 @@ class NodeFrame(BaseFrame):
 
         self.info.display(node)
 
+        # Create File menu
+        file_menu = wx.Menu()
+        file_menu.Append(wx.ID_CLOSE, "&Close Window\tCtrl+W")
+        file_menu.Append(ID_CLOSE_FILE, "Close &File\tCtrl+Shift+W")
+        file_menu.AppendSeparator()
+        file_menu.Append(wx.ID_EXIT, "E&xit\tAlt+F4")
+        self.add_menu(file_menu, "&File")
+
         self.Bind(wx.EVT_CLOSE, self.on_close_evt)
+        self.Bind(wx.EVT_MENU, self.on_close_window, id=wx.ID_CLOSE)
         self.Bind(wx.EVT_MENU, self.on_menu_closefile, id=ID_CLOSE_FILE)
+        self.Bind(wx.EVT_MENU, self.on_exit, id=wx.ID_EXIT)
 
         self._incref(node.store)
         pub.subscribe(self.on_notification_closefile, 'store.close')
 
     def on_notification_closefile(self):
         """ Pubsub notification that a file (any file) has been closed """
-        if not self.node.store.valid:
-            self.Destroy()
+        try:
+            # Check if frame still exists and store is invalid
+            if hasattr(self, 'node') and hasattr(self.node, 'store') and not self.node.store.valid:
+                # Check if the frame hasn't been destroyed already
+                if not self.IsBeingDeleted():
+                    self.Destroy()
+        except RuntimeError as e:
+            # Frame was already destroyed
+            log.debug(f"Frame already destroyed: {e}")
+        except Exception as e:
+            log.exception(f"Error in on_notification_closefile: {e}")
 
     def on_close_evt(self, evt):
         """ Window is about to be closed """
         self._decref(self.node.store)
         evt.Skip()
+
+    def on_close_window(self, evt):
+        """ Close Window menu item activated - close just this window """
+        self.Close()
+
+    def on_exit(self, evt):
+        """ Exit menu item activated - exit application """
+        wx.Exit()
 
     def on_menu_closefile(self, evt):
         """ "Close File" menu item activated.

@@ -31,7 +31,7 @@ log = logging.getLogger(__name__)
 from hdf_compass import compass_model
 from hdf_compass import utils
 
-from .events import ID_COMPASS_OPEN
+from .events import ID_COMPASS_OPEN, EVT_COMPASS_OPEN
 from . import container, array, geo_surface, geo_array, keyvalue, image, text
 from .frame import BaseFrame, InitFrame, NodeFrame  # Import all needed frame classes
 
@@ -85,7 +85,7 @@ class CompassApp(wx.App):
         self.imagelists = {}  # Initialize imagelists dictionary
         self.Bind(wx.EVT_MENU, self.on_about, id=wx.ID_ABOUT)
         self.Bind(wx.EVT_MENU, self.on_exit, id=wx.ID_EXIT)
-        self.Bind(wx.EVT_MENU, self.on_compass_open, id=ID_COMPASS_OPEN)
+        self.Bind(EVT_COMPASS_OPEN, self.on_compass_open)
 
     def OnInit(self):
         """ Initialize the application. """
@@ -113,10 +113,13 @@ class CompassApp(wx.App):
     def on_compass_open(self, evt):
         """ A request has been made to open a node from somewhere in the GUI
         """
+        log.debug(f"CompassApp.on_compass_open called with event: {evt}")
         # Get the node from the event
         node = evt.node
+        log.debug(f"CompassApp.on_compass_open - node: {node.key}, type: {type(node)}")
         # Get the position from the event if available
         pos = getattr(evt, 'pos', None)
+        log.debug(f"CompassApp.on_compass_open - calling open_node")
         # Open the node
         open_node(node, pos)
 
@@ -169,8 +172,13 @@ def open_node(node, pos=None):
         f.Show()
 
     elif isinstance(node, compass_model.Array):
-        f = array.ArrayFrame(node, pos=new_pos)
-        f.Show()
+        log.debug(f"Got Array - creating ArrayFrame for node: {node.key}")
+        try:
+            f = array.ArrayFrame(node, pos=new_pos)
+            log.debug(f"ArrayFrame created successfully, showing window")
+            f.Show()
+        except Exception as e:
+            log.exception(f"Error creating ArrayFrame: {e}")
 
     elif isinstance(node, compass_model.Xml):
         f = text.XmlFrame(node, pos=new_pos)

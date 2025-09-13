@@ -117,23 +117,21 @@ class ArrayFrame(NodeFrame):
         """ Create a new array frame """
         super(ArrayFrame, self).__init__(node, size=(800, 400), title=node.display_name, pos=pos)
 
-        # Create toolbar
-        # Only create toolbar if it doesn't exist
+        # Create array-specific toolbar (replace any existing toolbar)
         existing_toolbar = self.GetToolBar()
         if existing_toolbar:
-            self.toolbar = existing_toolbar
-        else:
-            self.toolbar = self.CreateToolBar()
+            existing_toolbar.Destroy()
+        
+        self.toolbar = self.CreateToolBar()
         self.toolbar.AddTool(wx.ID_COPY, "Copy", wx.ArtProvider.GetBitmap(wx.ART_COPY))
         self.toolbar.AddTool(wx.ID_SAVEAS, "Export", wx.ArtProvider.GetBitmap(wx.ART_FILE_SAVE))
         self.toolbar.AddTool(wx.ID_ZOOM_IN, "Plot Data", wx.ArtProvider.GetBitmap(wx.ART_PLUS))
         self.toolbar.AddTool(wx.ID_ZOOM_OUT, "Plot XY", wx.ArtProvider.GetBitmap(wx.ART_MINUS))
         self.toolbar.Realize()
 
-        # Create array panel
+        # Create array panel and set it as the view (this will properly layout with InfoPanel)
         self.array_panel = ArrayPanel(self, node)
-        self.SetSizer(wx.BoxSizer(wx.VERTICAL))
-        self.GetSizer().Add(self.array_panel, 1, wx.EXPAND)
+        self.view = self.array_panel
 
         # Bind events
         self.Bind(wx.EVT_TOOL, self.on_copy, id=wx.ID_COPY)

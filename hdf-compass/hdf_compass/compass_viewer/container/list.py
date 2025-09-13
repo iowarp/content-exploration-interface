@@ -82,6 +82,12 @@ class ContainerList(wx.ListCtrl):
         """ Handle item activation """
         index = evt.GetIndex()
         try:
+            # Check if store is still valid (not closed during shutdown)
+            if not hasattr(self.node, 'store') or not self.node.store.valid:
+                log.debug("Store is no longer valid, ignoring item activation")
+                evt.Skip()
+                return
+                
             if index < 0 or index >= len(self.node):
                 log.warning(f"Item activation index {index} out of bounds")
                 evt.Skip()
@@ -100,6 +106,12 @@ class ContainerList(wx.ListCtrl):
         """ Handle item selection """
         index = evt.GetIndex()
         try:
+            # Check if store is still valid (not closed during shutdown)
+            if not hasattr(self.node, 'store') or not self.node.store.valid:
+                log.debug("Store is no longer valid, ignoring item selection")
+                evt.Skip()
+                return
+                
             if index < 0 or index >= len(self.node):
                 log.warning(f"Item selection index {index} out of bounds")
                 evt.Skip()
@@ -136,10 +148,19 @@ class ContainerList(wx.ListCtrl):
     @property
     def selection(self):
         """ Return the currently selected node, or None """
-        index = self.GetFirstSelected()
-        if index != -1:
-            return self.node[index]
-        return None
+        try:
+            # Check if store is still valid (not closed during shutdown)
+            if not hasattr(self.node, 'store') or not self.node.store.valid:
+                log.debug("Store is no longer valid, returning None for selection")
+                return None
+                
+            index = self.GetFirstSelected()
+            if index != -1:
+                return self.node[index]
+            return None
+        except Exception as e:
+            log.debug(f"Error getting selection (likely due to shutdown): {e}")
+            return None
 
 
 class ContainerIconList(ContainerList):
@@ -253,9 +274,9 @@ class ContainerReportList(ContainerList):
         # Set up virtual list
         self.SetItemCount(len(node))
 
-        # Bind virtual list events
+        # Note: EVT_LIST_ITEM_ACTIVATED is already bound by parent ContainerList class
+        # Only bind the selection event which might need different handling for virtual list
         self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.on_item_selected)
-        self.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.on_item_activated)
 
         # Force initial layout
         self.Layout()
@@ -264,6 +285,10 @@ class ContainerReportList(ContainerList):
     def OnGetItemText(self, item, col):
         """ Callback method to support virtual list ctrl """
         try:
+            # Check if store is still valid (not closed during shutdown)
+            if not hasattr(self.node, 'store') or not self.node.store.valid:
+                return ""
+                
             # Check bounds first
             if item < 0 or item >= len(self.node):
                 log.warning(f"Item index {item} out of bounds (length: {len(self.node)})")
@@ -275,12 +300,16 @@ class ContainerReportList(ContainerList):
             elif col == 1:
                 return type(subnode).class_kind
         except Exception as e:
-            log.exception(f"Error getting item text for item {item}, col {col}: {e}")
+            log.debug(f"Error getting item text for item {item}, col {col} (likely due to shutdown): {e}")
         return ""
 
     def OnGetItemImage(self, item):
         """ Callback method to support virtual list ctrl """
         try:
+            # Check if store is still valid (not closed during shutdown)
+            if not hasattr(self.node, 'store') or not self.node.store.valid:
+                return -1
+                
             # Check bounds first
             if item < 0 or item >= len(self.node):
                 log.warning(f"Item index {item} out of bounds (length: {len(self.node)})")
@@ -291,12 +320,18 @@ class ContainerReportList(ContainerList):
                 return self.il.get_index(type(subnode))
             return -1
         except Exception as e:
-            log.exception(f"Error getting item image for item {item}: {e}")
+            log.debug(f"Error getting item image for item {item} (likely due to shutdown): {e}")
             return -1
 
     def populate(self):
         """ Override populate to use virtual list """
         try:
+            # Check if store is still valid (not closed during shutdown)
+            if not hasattr(self.node, 'store') or not self.node.store.valid:
+                log.debug("Store is no longer valid, setting item count to 0")
+                self.SetItemCount(0)
+                return
+                
             node_length = len(self.node)
             log.debug(f"Setting virtual list item count to {node_length}")
             self.SetItemCount(node_length)

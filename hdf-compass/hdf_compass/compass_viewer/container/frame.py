@@ -243,8 +243,10 @@ class ContainerFrame(NodeFrame):
                         self.go(selected_node)
                     else:
                         # Create an open event for the selected node to open in new window
+                        log.debug(f"Creating new window for non-container node: {selected_node.key} (type: {type(selected_node)})")
                         from ..events import CompassOpenEvent
                         open_event = CompassOpenEvent(selected_node, pos=self.GetPosition())
+                        log.debug(f"Posting CompassOpenEvent for node: {selected_node.key}")
                         wx.PostEvent(wx.GetApp(), open_event)
                 else:
                     log.debug("No node selected for open action")

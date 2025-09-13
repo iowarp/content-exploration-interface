@@ -174,7 +174,15 @@ class HDF5Group(compass_model.Container):
         return 'Group "%s" (%d members)' % (self.display_name, len(self))
 
     def __len__(self):
-        return len(self._group)
+        try:
+            # Check if store is still valid (not closed during shutdown)
+            if not self.store.valid:
+                log.debug("Store is no longer valid, returning 0 for group length")
+                return 0
+            return len(self._group)
+        except Exception as e:
+            log.debug(f"Error getting group length (likely due to shutdown): {e}")
+            return 0
 
     def __iter__(self):
         for name in self._names:
@@ -182,6 +190,11 @@ class HDF5Group(compass_model.Container):
 
     def __getitem__(self, idx):
         try:
+            # Check if store is still valid (not closed during shutdown)
+            if not self.store.valid:
+                log.debug("Store is no longer valid, cannot access items")
+                raise IndexError(f"Store is closed, cannot access item {idx}")
+                
             if idx < 0 or idx >= len(self._names):
                 raise IndexError(f"Index {idx} out of range for container with {len(self._names)} items")
             name = self._names[idx]
