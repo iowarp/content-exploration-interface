@@ -200,9 +200,11 @@ class ArrayFrame(NodeFrame):
         self.toolbar = self.CreateToolBar()
         self.toolbar.AddTool(wx.ID_COPY, "Copy", wx.ArtProvider.GetBitmap(wx.ART_COPY))
         self.toolbar.AddTool(wx.ID_SAVEAS, "Export", wx.ArtProvider.GetBitmap(wx.ART_FILE_SAVE))
-        # Use chart/graph-like icons for plotting
-        self.toolbar.AddTool(wx.ID_ZOOM_IN, "Plot Data", wx.ArtProvider.GetBitmap(wx.ART_TIP))
-        self.toolbar.AddTool(wx.ID_ZOOM_OUT, "Plot XY", wx.ArtProvider.GetBitmap(wx.ART_INFORMATION))
+        # Use specific plotting icons
+        plot_icon_path = os.path.join(os.path.dirname(__file__), "..", "icons", "viz_plot_32.png")
+        plot_xy_icon_path = os.path.join(os.path.dirname(__file__), "..", "icons", "viz_plot_xy_24.png")
+        self.toolbar.AddTool(wx.ID_ZOOM_IN, "Plot Data", wx.Bitmap(plot_icon_path, wx.BITMAP_TYPE_PNG))
+        self.toolbar.AddTool(wx.ID_ZOOM_OUT, "Plot XY", wx.Bitmap(plot_xy_icon_path, wx.BITMAP_TYPE_PNG))
         self.toolbar.Realize()
 
         # Create array panel and set it as the view (this will properly layout with InfoPanel)
