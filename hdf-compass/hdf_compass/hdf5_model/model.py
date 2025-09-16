@@ -308,12 +308,12 @@ class HDF5Text(compass_model.Text):
 
         elif len(self.shape) == 1:
             for el in self.data:
-                txt += el + ", \n"
+                txt += str(el) + ", \n"
 
         elif len(self.shape) == 2:
             for i in range(self.shape[0]):
                 for j in range(self.shape[1]):
-                    txt += self.data[i, j] + ", "
+                    txt += str(self.data[i, j]) + ", "
                 txt += "\n"
 
         else:
