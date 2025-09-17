@@ -34,30 +34,66 @@ class ArrayPanel(wx.Panel):
     def __init__(self, parent, node):
         super(ArrayPanel, self).__init__(parent)
         self.node = node
-        
+
         # Create a simple grid to show the array data
         self.grid = wx.grid.Grid(self)
-        
+
         # Set up grid based on array shape
-        if len(node.shape) == 0:  # scalar
-            self.grid.CreateGrid(1, 1)
-            self.grid.SetCellValue(0, 0, str(node[:]))
-        elif len(node.shape) == 1:  # 1D array
-            rows = min(node.shape[0], 1000)  # Limit display for performance
-            self.grid.CreateGrid(rows, 1)
-            data = node[:rows]
-            for i in range(rows):
-                self.grid.SetCellValue(i, 0, str(data[i]))
-        else:  # 2D or higher
-            rows = min(node.shape[0], 100)
-            cols = min(node.shape[1], 100) if len(node.shape) > 1 else 1
-            self.grid.CreateGrid(rows, cols)
-            if len(node.shape) == 2:
-                data = node[:rows, :cols]
-                for i in range(rows):
-                    for j in range(cols):
-                        self.grid.SetCellValue(i, j, str(data[i, j]))
-        
+        try:
+            if len(node.shape) == 0:  # scalar
+                self.grid.CreateGrid(1, 1)
+                try:
+                    value = node[()]
+                    self.grid.SetCellValue(0, 0, str(value))
+                except Exception as e:
+                    self.grid.SetCellValue(0, 0, f"<Error: {e}>")
+            elif len(node.shape) == 1:  # 1D array
+                rows = min(node.shape[0], 1000)  # Limit display for performance
+                self.grid.CreateGrid(rows, 1)
+                try:
+                    data = node[:rows]
+                    for i in range(rows):
+                        try:
+                            value = data[i]
+                            # Handle numpy types and bytes
+                            if hasattr(value, 'item'):
+                                value = value.item()
+                            if isinstance(value, bytes):
+                                value = value.decode('utf-8', errors='replace')
+                            self.grid.SetCellValue(i, 0, str(value))
+                        except Exception as e:
+                            self.grid.SetCellValue(i, 0, f"<Error: {e}>")
+                except Exception as e:
+                    # If we can't read the data at all, show an error message
+                    self.grid.SetCellValue(0, 0, f"<Error reading data: {e}>")
+            else:  # 2D or higher
+                rows = min(node.shape[0], 100)
+                cols = min(node.shape[1], 100) if len(node.shape) > 1 else 1
+                self.grid.CreateGrid(rows, cols)
+                if len(node.shape) == 2:
+                    try:
+                        data = node[:rows, :cols]
+                        for i in range(rows):
+                            for j in range(cols):
+                                try:
+                                    value = data[i, j]
+                                    # Handle numpy types and bytes
+                                    if hasattr(value, 'item'):
+                                        value = value.item()
+                                    if isinstance(value, bytes):
+                                        value = value.decode('utf-8', errors='replace')
+                                    self.grid.SetCellValue(i, j, str(value))
+                                except Exception as e:
+                                    self.grid.SetCellValue(i, j, f"<Error: {e}>")
+                    except Exception as e:
+                        # If we can't read the data at all, show an error message
+                        self.grid.SetCellValue(0, 0, f"<Error reading data: {e}>")
+        except Exception as e:
+            # Fallback: create a minimal grid with error message
+            if not hasattr(self, 'grid') or self.grid.GetNumberRows() == 0:
+                self.grid.CreateGrid(1, 1)
+            self.grid.SetCellValue(0, 0, f"<Error initializing grid: {e}>")
+
         # Layout
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(self.grid, 1, wx.EXPAND)
@@ -272,7 +308,7 @@ class ArrayFrame(NodeFrame):
         existing_toolbar = self.GetToolBar()
         if existing_toolbar:
             existing_toolbar.Destroy()
-        
+
         self.toolbar = self.CreateToolBar()
         self.toolbar.AddTool(wx.ID_COPY, "Copy", wx.ArtProvider.GetBitmap(wx.ART_COPY))
         self.toolbar.AddTool(wx.ID_SAVEAS, "Export", wx.ArtProvider.GetBitmap(wx.ART_FILE_SAVE))
@@ -283,9 +319,38 @@ class ArrayFrame(NodeFrame):
         self.toolbar.AddTool(wx.ID_ZOOM_OUT, "Plot XY", wx.Bitmap(plot_xy_icon_path, wx.BITMAP_TYPE_PNG))
         self.toolbar.Realize()
 
-        # Create array panel and set it as the view (this will properly layout with InfoPanel)
-        self.array_panel = ArrayPanel(self, node)
-        self.view = self.array_panel
+        # Initialize dimension selection for multidimensional arrays first
+        if len(node.shape) > 2:
+            self.rowSpin = wx.SpinCtrl(self, max=len(node.shape)-1, value="0", min=0)
+            self.colSpin = wx.SpinCtrl(self, max=len(node.shape)-1, value="1", min=0)
+            self.rowSpin.Bind(wx.EVT_SPINCTRL, self.on_dimSpin)
+            self.colSpin.Bind(wx.EVT_SPINCTRL, self.on_dimSpin)
+        else:
+            # For 1D and 2D arrays, set default row/col indices
+            self.rowSpin = None
+            self.colSpin = None
+
+        # Create the proper array view components first (before layout)
+        # Create slicer panel for dimension control (parent must be ArrayFrame for indices property)
+        self.slicer = SlicerPanel(self, node.shape, node.dtype.names is not None)
+
+        # Layout components
+        main_panel = wx.Panel(self)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+
+        # Create grid for data display - need to pass ArrayFrame reference for table
+        self.grid = ArrayGrid(main_panel, node, self.slicer, array_frame=self)
+
+        # Add slicer if needed (reparent it to main_panel for proper layout)
+        if len(node.shape) > (1 if node.dtype.names is not None else 2):
+            self.slicer.Reparent(main_panel)
+            sizer.Add(self.slicer, 0, wx.EXPAND | wx.ALL, 5)
+
+        # Add grid
+        sizer.Add(self.grid, 1, wx.EXPAND | wx.ALL, 5)
+
+        main_panel.SetSizer(sizer)
+        self.view = main_panel
 
         # Bind events
         self.Bind(wx.EVT_TOOL, self.on_copy, id=wx.ID_COPY)
@@ -293,9 +358,25 @@ class ArrayFrame(NodeFrame):
         self.Bind(wx.EVT_TOOL, self.on_plot_data, id=wx.ID_ZOOM_IN)
         self.Bind(wx.EVT_TOOL, self.on_plot_xy, id=wx.ID_ZOOM_OUT)
 
+        # Bind array events
+        self.Bind(EVT_ARRAY_SLICED, self.on_sliced)
+        self.Bind(EVT_ARRAY_SELECTED, self.on_selected)
+
+        # Enable slicer controls after a short delay (wxPython Mac bug workaround)
+        if hasattr(self.slicer, 'enable_spinctrls'):
+            self.timer = wx.Timer(self)
+            self.timer.Start(100, True)
+            self.Bind(wx.EVT_TIMER, self.on_workaround_timer)
+
     def on_copy(self, evt):
         """ Handle copy toolbar button """
-        self.array_panel.copy()
+        # Get selected data and copy to clipboard
+        data, names, line = self.get_selected_data()
+        if data is not None:
+            csv_data = gen_csv(data, self.csv_delimiters_copy)
+            if wx.TheClipboard.Open():
+                wx.TheClipboard.SetData(wx.TextDataObject(csv_data))
+                wx.TheClipboard.Close()
 
     def on_export(self, evt):
         """ Handle export toolbar button """
@@ -303,15 +384,36 @@ class ArrayFrame(NodeFrame):
                           style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT) as dlg:
             if dlg.ShowModal() == wx.ID_OK:
                 path = dlg.GetPath()
-                self.array_panel.export(path)
+                data, names, line = self.get_selected_data()
+                if data is not None:
+                    csv_data = gen_csv(data, self.csv_delimiters_export)
+                    with open(path, 'w') as f:
+                        f.write(csv_data)
 
     def on_plot_data(self, evt):
         """ Handle plot data toolbar button """
-        self.array_panel.plot_data()
+        data, names, line = self.get_selected_data()
+        if data is not None:
+            if line:
+                from .plot import LinePlotFrame
+                plot_frame = LinePlotFrame(data, names, title=f"Plot: {self.node.display_name}")
+                plot_frame.Show()
+            else:
+                from .plot import ContourPlotFrame
+                plot_frame = ContourPlotFrame(data, names, title=f"Contour: {self.node.display_name}")
+                plot_frame.Show()
 
     def on_plot_xy(self, evt):
         """ Handle plot XY toolbar button """
-        self.array_panel.plot_xy()
+        data, names, line = self.get_selected_data()
+        if data is not None and line:
+            from .plot import LineXYPlotFrame
+            # For XY plot, we need at least 2 data series
+            if len(data) >= 2:
+                plot_frame = LineXYPlotFrame(data, names, title=f"XY Plot: {self.node.display_name}")
+                plot_frame.Show()
+            else:
+                wx.MessageBox("XY plotting requires at least 2 data series", "Plot Error", wx.OK | wx.ICON_ERROR)
 
     def on_selected(self, evt):
         """ User has chosen to display a different part of the dataset. """
@@ -413,7 +515,7 @@ class ArrayFrame(NodeFrame):
 
         """
         l = []
-        for x in xrange(len(self.node.shape)):
+        for x in range(len(self.node.shape)):
             if x == self.row or x == self.col:
                 continue    
             l.append(x)
@@ -423,30 +525,37 @@ class ArrayFrame(NodeFrame):
     def row(self):
         """ The dimension selected for the row
         """
-        return self.rowSpin.GetValue()
-        
+        if self.rowSpin is not None:
+            return self.rowSpin.GetValue()
+        return 0  # Default to first dimension
+
     @property
     def col(self):
         """ The dimension selected for the column
         """
-        return self.colSpin.GetValue()
+        if self.colSpin is not None:
+            return self.colSpin.GetValue()
+        return 1 if len(self.node.shape) > 1 else 0  # Default to second dimension or first if 1D
         
         
     def on_dimSpin(self, evt):
-        """ Dimmension Spinbox value changed; notify parent to refresh the grid. """
+        """ Dimension Spinbox value changed; notify parent to refresh the grid. """
+        if self.rowSpin is None or self.colSpin is None:
+            return
+
         pos = evt.GetPosition()
         otherSpinner = self.rowSpin
-        
-        if evt.GetEventObject() == self.rowSpin :
+
+        if evt.GetEventObject() == self.rowSpin:
             otherSpinner = self.colSpin
 
         if pos == otherSpinner.GetValue():
-            if (pos > 0) :
-                pos =  pos - 1
+            if (pos > 0):
+                pos = pos - 1
             else:
                 pos = pos + 1
             otherSpinner.SetValue(pos)
-        
+
         wx.PostEvent(self, ArraySelectionEvent(self.GetId()))
 
 class SlicerPanel(wx.Panel):
@@ -494,7 +603,7 @@ class SlicerPanel(wx.Panel):
             infotext = wx.StaticText(self, wx.ID_ANY, "Array Indexing: ")
             sizer.Add(infotext, 0, flag=wx.EXPAND | wx.ALL, border=10)
 
-            for idx in xrange(rank - visible_rank):
+            for idx in range(rank - visible_rank):
                 maxVal = shape[idx] - 1
                 if not hasfields:
                     maxVal = shape[self.parent.indices[idx]] - 1
@@ -532,20 +641,42 @@ class ArrayGrid(wx.grid.Grid):
     Cell contents and appearance are handled by the table model in ArrayTable.
     """
 
-    def __init__(self, parent, node, slicer):
+    def __init__(self, parent, node, slicer, array_frame=None):
         wx.grid.Grid.__init__(self, parent)
-        table = ArrayTable(parent)
+        # Use array_frame if provided, otherwise use parent (for backward compatibility)
+        table_parent = array_frame if array_frame is not None else parent
+        table = ArrayTable(table_parent)
         self.SetTable(table, True)
 
-        # Column selection is always allowed
-        selmode = wx.grid.Grid.wxGridSelectColumns
-        
-        # Row selection is forbidden for compound types, and for
-        # scalar/1-D datasets
-        if node.dtype.names is None and len(node.shape) > 1:
-            selmode |= wx.grid.Grid.wxGridSelectRows
-        
-        self.SetSelectionMode(selmode)
+        # Set selection mode - try different wxPython versions
+        try:
+            # Modern wxPython (4.x)
+            selmode = wx.grid.Grid.GridSelectionModes.GridSelectColumns
+            if node.dtype.names is None and len(node.shape) > 1:
+                selmode = wx.grid.Grid.GridSelectionModes.GridSelectRowsAndColumns
+        except AttributeError:
+            try:
+                # Older wxPython versions
+                selmode = wx.grid.Grid.wxGridSelectColumns
+                if node.dtype.names is None and len(node.shape) > 1:
+                    selmode |= wx.grid.Grid.wxGridSelectRows
+            except AttributeError:
+                try:
+                    # Try without wx prefix
+                    selmode = wx.grid.GridSelectColumns
+                    if node.dtype.names is None and len(node.shape) > 1:
+                        selmode |= wx.grid.GridSelectRows
+                except AttributeError:
+                    # Last resort - use numeric constants
+                    selmode = 2  # GridSelectColumns
+                    if node.dtype.names is None and len(node.shape) > 1:
+                        selmode |= 1  # GridSelectRows
+
+        try:
+            self.SetSelectionMode(selmode)
+        except Exception:
+            # If setting selection mode fails, just continue without it
+            pass
            
     def ResetView(self):
             """Trim/extend the grid if needed"""
@@ -705,43 +836,63 @@ class ArrayTable(wx.grid.PyGridTableBase):
 
         row, col:   Integers giving row and column position (0-based).
         """
-        # Scalar case
-        if self.rank == 0:
-            data = self.node[()]
-            if self.names is None:
-                return data
-            return data[col]
+        try:
+            # Scalar case
+            if self.rank == 0:
+                data = self.node[()]
+                if self.names is None:
+                    return self._format_value(data)
+                return self._format_value(data[col])
 
-        # 1D case
-        if self.rank == 1:
-            data = self.cache[row]
-            if self.names is None:
-                return data
-            return data[self.names[col]]
+            # 1D case
+            if self.rank == 1:
+                data = self.cache[row]
+                if self.names is None:
+                    return self._format_value(data)
+                return self._format_value(data[self.names[col]])
 
-        # ND case.  Watch out for compound mode!
-        if self.names is not None:
-            args = self.slicer.indices + (row,)
-        else:
-            l = []
-            for x in xrange(self.rank):
-                if x == self.selecter.row:
-                    l.append(row)
-                elif x == self.selecter.col:
-                    l.append(col)
-                else:
-                    idx = 0
-                    for y in self.selecter.indices:
-                        if y == x:
-                            l.append(self.slicer.indices[idx])
-                            break
-                        idx = idx + 1
-            args = tuple(l)
-        
-        data = self.cache[args]
-        if self.names is None:
-            return data
-        return data[self.names[col]]
+            # ND case.  Watch out for compound mode!
+            if self.names is not None:
+                args = self.slicer.indices + (row,)
+            else:
+                l = []
+                for x in range(self.rank):
+                    if x == self.selecter.row:
+                        l.append(row)
+                    elif x == self.selecter.col:
+                        l.append(col)
+                    else:
+                        idx = 0
+                        for y in self.selecter.indices:
+                            if y == x:
+                                l.append(self.slicer.indices[idx])
+                                break
+                            idx = idx + 1
+                args = tuple(l)
+
+            data = self.cache[args]
+            if self.names is None:
+                return self._format_value(data)
+            return self._format_value(data[self.names[col]])
+
+        except Exception as e:
+            return f"<Error: {e}>"
+
+    def _format_value(self, value):
+        """ Format a value for display in the grid """
+        try:
+            # Handle numpy scalar types
+            if hasattr(value, 'item'):
+                value = value.item()
+
+            # Handle bytes
+            if isinstance(value, bytes):
+                return value.decode('utf-8', errors='replace')
+
+            # Convert to string
+            return str(value)
+        except Exception as e:
+            return f"<Format Error: {e}>"
 
     def GetRowLabelValue(self, row):
         """ Callback for row labels.
