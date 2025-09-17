@@ -312,6 +312,21 @@ def load_plugins():
         log.warning("HDF5 REST plugin: NOT loaded")
 
     try:
+        from hdf_compass import csv_model
+        import pandas as pd
+        log.debug("CSV plugin loaded (pandas %s)" % pd.__version__)
+    except ImportError:
+        log.warning("CSV plugin: NOT loaded (pandas not available)")
+
+    try:
+        from hdf_compass import parquet_model
+        import pandas as pd
+        import pyarrow
+        log.debug("Parquet plugin loaded (pandas %s, pyarrow %s)" % (pd.__version__, pyarrow.__version__))
+    except ImportError:
+        log.warning("Parquet plugin: NOT loaded (pandas or pyarrow not available)")
+
+    try:
         from hdf_compass import adios_model
         import adios
         log.debug("ADIOS %s" % adios.__version__)

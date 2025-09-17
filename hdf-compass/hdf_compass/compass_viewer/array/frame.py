@@ -459,7 +459,11 @@ class ArrayFrame(NodeFrame):
             if self.row > self.col:
                 data = np.transpose(data)
         else:
-            data = self.node[self.slicer.indices]
+            # For structured arrays, use slice access to maintain field name support
+            if self.node.dtype.names is not None and self.slicer.indices == ():
+                data = self.node[:]
+            else:
+                data = self.node[self.slicer.indices]
 
         # Columns in the view are selected
         if len(cols) != 0:
@@ -773,7 +777,12 @@ class LRUTileCache(object):
             if len(self.cache) >= self.MAXTILES:
                 self.cache.popitem(last=False)
 
-            tile = self.arr[tile_slice]
+            # Use the array's __getitem__ method to ensure proper structured data handling
+            # This is important for CSV/Parquet files that return structured records
+            if hasattr(self.arr, '__getitem__'):
+                tile = self.arr.__getitem__(tile_slice)
+            else:
+                tile = self.arr[tile_slice]
             self.cache[tile_key] = tile
 
         # Case 2: Mark the tile as recently accessed
