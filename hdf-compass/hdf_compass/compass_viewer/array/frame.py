@@ -76,14 +76,54 @@ class ArrayPanel(wx.Panel):
         try:
             from .plot import LinePlotFrame, ContourPlotFrame
             import numpy as np
-            
+
             # Get the array frame to access the node data
             array_frame = self.GetParent()
             node = array_frame.node
-            
+
+            # Check if columns are selected in the grid
+            selected_cols = self.grid.GetSelectedCols()
+            selected_rows = self.grid.GetSelectedRows()
+
             # Get the raw data from the node
             data = node[:]
-            
+
+            # Handle column selection for plotting
+            if len(selected_cols) > 0 and len(data.shape) >= 2:
+                # Plot selected columns as separate line plots
+                selected_data = []
+                names = []
+                for col in selected_cols:
+                    if col < data.shape[1]:
+                        selected_data.append(data[:, col])
+                        names.append(f"Column {col}")
+
+                if selected_data:
+                    plot_frame = LinePlotFrame(selected_data, names, title=f"Plot (selected columns): {node.display_name}")
+                    plot_frame.Show()
+                    return
+
+            # Handle row selection for plotting
+            elif len(selected_rows) > 0 and len(data.shape) >= 1:
+                # Plot selected rows as separate line plots
+                selected_data = []
+                names = []
+                for row in selected_rows:
+                    if row < data.shape[0]:
+                        if len(data.shape) == 1:
+                            # For 1D data, just plot the single value (not very useful)
+                            selected_data.append([data[row]])
+                        else:
+                            # For 2D+ data, plot the row as a line
+                            selected_data.append(data[row, :])
+                        names.append(f"Row {row}")
+
+                if selected_data:
+                    plot_frame = LinePlotFrame(selected_data, names, title=f"Plot (selected rows): {node.display_name}")
+                    plot_frame.Show()
+                    return
+
+            # No selection - plot all data using original logic
             # Determine plot type based on dimensionality
             if len(data.shape) == 0:
                 wx.MessageBox("Cannot plot scalar data", "Plot Error", wx.OK | wx.ICON_ERROR)
@@ -101,9 +141,9 @@ class ArrayPanel(wx.Panel):
                 else:
                     data_2d = data[0]
                 plot_frame = ContourPlotFrame(data_2d, ["Data"], title=f"Contour (slice): {node.display_name}")
-                
+
             plot_frame.Show()
-            
+
         except Exception as e:
             wx.MessageBox(f"Error creating plot: {e}", "Plot Error", wx.OK | wx.ICON_ERROR)
         
@@ -112,14 +152,50 @@ class ArrayPanel(wx.Panel):
         try:
             from .plot import LineXYPlotFrame
             import numpy as np
-            
+
             # Get the array frame to access the node data
             array_frame = self.GetParent()
             node = array_frame.node
-            
+
+            # Check if columns are selected in the grid
+            selected_cols = self.grid.GetSelectedCols()
+
             # Get the raw data from the node
             data = node[:]
-            
+
+            # Handle column selection for XY plotting
+            if len(selected_cols) >= 2 and len(data.shape) >= 2:
+                # Use first selected column as X and subsequent columns as Y series
+                selected_cols = sorted(selected_cols)
+                x_col = selected_cols[0]
+                x_data = data[:, x_col]
+                plot_data = [x_data]
+                names = [f"Column {x_col}"]
+
+                # Add all other selected columns as Y series
+                for y_col in selected_cols[1:]:
+                    if y_col < data.shape[1]:
+                        plot_data.append(data[:, y_col])
+                        names.append(f"Column {y_col}")
+
+                plot_frame = LineXYPlotFrame(plot_data, names, title=f"XY Plot (selected columns): {node.display_name}")
+                plot_frame.Show()
+                return
+
+            elif len(selected_cols) == 1 and len(data.shape) >= 2:
+                # Only one column selected - use row indices as X
+                col = selected_cols[0]
+                if col < data.shape[1]:
+                    x_data = np.arange(data.shape[0])
+                    y_data = data[:, col]
+                    plot_data = [x_data, y_data]
+                    names = ["Row Index", f"Column {col}"]
+
+                    plot_frame = LineXYPlotFrame(plot_data, names, title=f"XY Plot (Column {col}): {node.display_name}")
+                    plot_frame.Show()
+                    return
+
+            # No selection or insufficient selection - use original logic
             # For XY plot, we need at least 2D data or 1D data that can be split
             if len(data.shape) == 0:
                 wx.MessageBox("Cannot create XY plot from scalar data", "Plot Error", wx.OK | wx.ICON_ERROR)
@@ -146,11 +222,11 @@ class ArrayPanel(wx.Panel):
             else:
                 wx.MessageBox("XY plotting not supported for data with more than 2 dimensions", "Plot Error", wx.OK | wx.ICON_ERROR)
                 return
-                
+
             # Create XY plot
             plot_frame = LineXYPlotFrame(plot_data, names, title=f"XY Plot: {node.display_name}")
             plot_frame.Show()
-            
+
         except Exception as e:
             wx.MessageBox(f"Error creating XY plot: {e}", "Plot Error", wx.OK | wx.ICON_ERROR)
 
